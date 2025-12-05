@@ -4,10 +4,6 @@ import { storeToRefs } from 'pinia'
 import { ref, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import type { AnalysisSession } from '@/types/chat'
-import pkg from '../../../package.json'
-
-const { version } = pkg
-
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -331,11 +327,6 @@ function isPrivateChat(session: AnalysisSession): boolean {
           <span v-if="!isCollapsed" class="truncate">设置</span>
         </UButton>
       </UTooltip>
-
-      <!-- 版本号 & 社交链接 -->
-      <div v-if="!isCollapsed" class="flex items-center justify-center gap-2 py-1 text-xs text-gray-400">
-        <span>v{{ version }}</span>
-      </div>
     </div>
   </div>
 </template>

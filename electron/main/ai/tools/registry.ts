@@ -54,8 +54,8 @@ async function searchMessagesExecutor(
   context: ToolContext
 ): Promise<unknown> {
   const { sessionId, timeFilter: contextTimeFilter, maxMessagesLimit } = context
-  // 优先使用 LLM 指定的 limit，其次使用用户配置，最后使用默认值 200，上限 5000
-  const limit = Math.min(params.limit || maxMessagesLimit || 200, 5000)
+  // 用户配置优先：如果用户设置了 maxMessagesLimit，使用它；否则使用 LLM 指定的值或默认值 200，上限 5000
+  const limit = Math.min(maxMessagesLimit || params.limit || 200, 5000)
 
   // 构建时间过滤器：优先使用 LLM 指定的年/月，否则使用 context 中的
   let effectiveTimeFilter = contextTimeFilter
@@ -144,8 +144,15 @@ async function getRecentMessagesExecutor(
   context: ToolContext
 ): Promise<unknown> {
   const { sessionId, timeFilter: contextTimeFilter, maxMessagesLimit } = context
-  // 优先使用 LLM 指定的 limit，其次使用用户配置，最后使用默认值 100
-  const limit = params.limit || maxMessagesLimit || 100
+  // 用户配置优先：如果用户设置了 maxMessagesLimit，使用它；否则使用 LLM 指定的值或默认值 100
+  const limit = maxMessagesLimit || params.limit || 100
+
+  console.log('[getRecentMessages] 参数调试:', {
+    'params.limit': params.limit,
+    'context.maxMessagesLimit': maxMessagesLimit,
+    '计算后的 limit': limit,
+    'context 完整内容': JSON.stringify(context),
+  })
 
   // 构建时间过滤器：优先使用 LLM 指定的年/月
   let effectiveTimeFilter = contextTimeFilter
@@ -495,8 +502,8 @@ async function getConversationBetweenExecutor(
   context: ToolContext
 ): Promise<unknown> {
   const { sessionId, timeFilter: contextTimeFilter, maxMessagesLimit } = context
-  // 优先使用 LLM 指定的 limit，其次使用用户配置，最后使用默认值 100
-  const limit = params.limit || maxMessagesLimit || 100
+  // 用户配置优先：如果用户设置了 maxMessagesLimit，使用它；否则使用 LLM 指定的值或默认值 100
+  const limit = maxMessagesLimit || params.limit || 100
 
   // 构建时间过滤器
   let effectiveTimeFilter = contextTimeFilter

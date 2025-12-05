@@ -472,7 +472,15 @@ const aiApi = {
     dataMessageCount?: number,
     contentBlocks?: ContentBlock[]
   ): Promise<AIMessage> => {
-    return ipcRenderer.invoke('ai:addMessage', conversationId, role, content, dataKeywords, dataMessageCount, contentBlocks)
+    return ipcRenderer.invoke(
+      'ai:addMessage',
+      conversationId,
+      role,
+      content,
+      dataKeywords,
+      dataMessageCount,
+      contentBlocks
+    )
   },
 
   /**

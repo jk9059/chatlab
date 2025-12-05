@@ -32,8 +32,8 @@ const formData = ref({
 const isBuiltIn = computed(() => props.preset?.isBuiltIn ?? false)
 const isEditMode = computed(() => props.mode === 'edit')
 const modalTitle = computed(() => {
-  if (isBuiltIn.value) return '查看预设'
-  return isEditMode.value ? '编辑预设' : '添加预设'
+  if (isBuiltIn.value) return '查看系统提示词'
+  return isEditMode.value ? '编辑系统提示词' : '添加系统提示词'
 })
 
 const canSave = computed(() => {
@@ -149,7 +149,7 @@ function getLockedPromptSection(chatType: string): string {
 - 当用户提到"对方"、"他/她"时，通过 get_group_members 获取另一方信息`
     : `成员查询策略：
 - 当用户提到特定群成员（如"张三说过什么"、"小明的发言"等）时，应先调用 get_group_members 获取成员列表
-- 群成员有三种名称：accountName（QQ原始昵称）、groupNickname（群昵称）、aliases（用户自定义别名）
+- 群成员有三种名称：accountName（原始昵称）、groupNickname（群昵称）、aliases（用户自定义别名）
 - 通过 get_group_members 的 search 参数可以模糊搜索这三种名称
 - 找到成员后，使用其 id 字段作为 search_messages 的 sender_id 参数来获取该成员的发言`
 
@@ -213,12 +213,15 @@ ${formData.value.responseRules}`
           <!-- 预设名称 -->
           <div>
             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">预设名称</label>
-            <UInput v-model="formData.name" placeholder="为预设起个名字" :disabled="isBuiltIn" />
+            <UInput v-model="formData.name" placeholder="为预设起个名字" :disabled="isBuiltIn" class="w-60" />
           </div>
 
           <!-- 适用类型（只读显示） -->
           <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <UIcon :name="formData.chatType === 'group' ? 'i-heroicons-chat-bubble-left-right' : 'i-heroicons-user'" class="h-4 w-4" />
+            <UIcon
+              :name="formData.chatType === 'group' ? 'i-heroicons-chat-bubble-left-right' : 'i-heroicons-user'"
+              class="h-4 w-4"
+            />
             <span>适用于{{ formData.chatType === 'group' ? '群聊' : '私聊' }}</span>
           </div>
 
@@ -227,10 +230,10 @@ ${formData.value.responseRules}`
             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">角色定义</label>
             <UTextarea
               v-model="formData.roleDefinition"
-              :rows="5"
+              :rows="8"
               placeholder="定义 AI 助手的角色和任务..."
               :disabled="isBuiltIn"
-              class="font-mono text-sm"
+              class="font-mono text-sm w-120"
             />
           </div>
 
@@ -245,7 +248,7 @@ ${formData.value.responseRules}`
               :rows="5"
               placeholder="定义 AI 回答的格式和要求..."
               :disabled="isBuiltIn"
-              class="font-mono text-sm"
+              class="font-mono text-sm w-120"
             />
           </div>
 
@@ -256,7 +259,7 @@ ${formData.value.responseRules}`
               完整提示词预览
             </label>
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-              <pre class="max-h-48 overflow-y-auto whitespace-pre-wrap text-xs text-gray-700 dark:text-gray-300">{{ previewContent }}</pre>
+              <pre class="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{{ previewContent }}</pre>
             </div>
           </div>
         </div>
@@ -272,4 +275,3 @@ ${formData.value.responseRules}`
     </template>
   </UModal>
 </template>
-

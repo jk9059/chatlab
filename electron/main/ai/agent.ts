@@ -147,7 +147,7 @@ function getLockedPromptSection(chatType: 'group' | 'private'): string {
 `
     : `成员查询策略：
 - 当用户提到特定群成员（如"张三说过什么"、"小明的发言"等）时，应先调用 get_group_members 获取成员列表
-- 群成员有三种名称：accountName（QQ原始昵称）、groupNickname（群昵称）、aliases（用户自定义别名）
+- 群成员有三种名称：accountName（原始昵称）、groupNickname（群昵称）、aliases（用户自定义别名）
 - 通过 get_group_members 的 search 参数可以模糊搜索这三种名称
 - 找到成员后，使用其 id 字段作为 search_messages 的 sender_id 参数来获取该成员的发言
 `
@@ -553,6 +553,16 @@ export class Agent {
           let toolParams: Record<string, unknown> | undefined
           try {
             toolParams = JSON.parse(tc.function.arguments || '{}')
+
+            // 对于消息获取类工具，用用户配置的 limit 覆盖 LLM 传递的值（保持显示一致）
+            const toolsWithLimit = ['search_messages', 'get_recent_messages', 'get_conversation_between']
+            if (this.context.maxMessagesLimit && toolsWithLimit.includes(tc.function.name)) {
+              toolParams = {
+                ...toolParams,
+                limit: this.context.maxMessagesLimit, // 用户配置优先
+              }
+            }
+
             // 对于搜索类工具，添加时间范围信息
             if (
               this.context.timeFilter &&

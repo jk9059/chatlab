@@ -476,11 +476,13 @@ export function registerAIHandlers({ win }: IpcContext): void {
             if (abortController.signal.aborted) {
               return
             }
-            aiLogger.debug('IPC', `Agent chunk: ${requestId}`, {
-              type: chunk.type,
-              contentLength: chunk.content?.length,
-              toolName: chunk.toolName,
-            })
+            // 减少日志噪音：只在工具调用时记录
+            if (chunk.type === 'tool_start' || chunk.type === 'tool_result') {
+              aiLogger.debug('IPC', `Agent chunk: ${requestId}`, {
+                type: chunk.type,
+                toolName: chunk.toolName,
+              })
+            }
             win.webContents.send('agent:streamChunk', { requestId, chunk })
           })
 

@@ -105,9 +105,9 @@ function isActivePreset(presetId: string, chatType: 'group' | 'private'): boolea
       <div class="mb-3 flex items-center justify-between">
         <h4 class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
           <UIcon name="i-heroicons-chat-bubble-left-right" class="h-4 w-4 text-violet-500" />
-          群聊预设
+          群聊系统提示词
         </h4>
-        <UButton size="xs" variant="ghost" color="gray" @click="openAddModal('group')">
+        <UButton variant="ghost" color="gray" @click="openAddModal('group')">
           <UIcon name="i-heroicons-plus" class="mr-1 h-3.5 w-3.5" />
           添加
         </UButton>
@@ -141,17 +141,17 @@ function isActivePreset(presetId: string, chatType: 'group' | 'private'): boolea
             </div>
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-900 dark:text-white">{{ preset.name }}</span>
-              <UBadge v-if="preset.isBuiltIn" color="gray" variant="soft" size="xs">内置</UBadge>
+              <UBadge v-if="preset.isBuiltIn" color="gray" variant="soft">内置</UBadge>
             </div>
           </div>
 
           <!-- 操作按钮 -->
           <div class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100" @click.stop>
-            <UButton size="xs" color="gray" variant="ghost" @click="openEditModal(preset)">
+            <UButton color="gray" variant="ghost" @click="openEditModal(preset)">
               {{ preset.isBuiltIn ? '查看' : '编辑' }}
             </UButton>
-            <UButton size="xs" color="gray" variant="ghost" @click="duplicatePreset(preset.id)">复制</UButton>
-            <UButton v-if="!preset.isBuiltIn" size="xs" color="error" variant="ghost" @click="deletePreset(preset.id)">
+            <UButton color="gray" variant="ghost" @click="duplicatePreset(preset.id)">复制</UButton>
+            <UButton v-if="!preset.isBuiltIn" color="error" variant="ghost" @click="deletePreset(preset.id)">
               删除
             </UButton>
           </div>
@@ -162,14 +162,14 @@ function isActivePreset(presetId: string, chatType: 'group' | 'private'): boolea
     <!-- 分隔线 -->
     <div class="border-t border-gray-200 dark:border-gray-700"></div>
 
-    <!-- 私聊预设组 -->
+    <!-- 私聊系统提示词 -->
     <div>
       <div class="mb-3 flex items-center justify-between">
         <h4 class="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
           <UIcon name="i-heroicons-user" class="h-4 w-4 text-blue-500" />
-          私聊预设
+          私聊系统提示词
         </h4>
-        <UButton size="xs" variant="ghost" color="gray" @click="openAddModal('private')">
+        <UButton variant="ghost" color="gray" @click="openAddModal('private')">
           <UIcon name="i-heroicons-plus" class="mr-1 h-3.5 w-3.5" />
           添加
         </UButton>
@@ -203,31 +203,21 @@ function isActivePreset(presetId: string, chatType: 'group' | 'private'): boolea
             </div>
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-900 dark:text-white">{{ preset.name }}</span>
-              <UBadge v-if="preset.isBuiltIn" color="gray" variant="soft" size="xs">内置</UBadge>
+              <UBadge v-if="preset.isBuiltIn" color="gray" variant="soft">内置</UBadge>
             </div>
           </div>
 
           <!-- 操作按钮 -->
           <div class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100" @click.stop>
-            <UButton size="xs" color="gray" variant="ghost" @click="openEditModal(preset)">
+            <UButton color="gray" variant="ghost" @click="openEditModal(preset)">
               {{ preset.isBuiltIn ? '查看' : '编辑' }}
             </UButton>
-            <UButton size="xs" color="gray" variant="ghost" @click="duplicatePreset(preset.id)">复制</UButton>
-            <UButton v-if="!preset.isBuiltIn" size="xs" color="error" variant="ghost" @click="deletePreset(preset.id)">
+            <UButton color="gray" variant="ghost" @click="duplicatePreset(preset.id)">复制</UButton>
+            <UButton v-if="!preset.isBuiltIn" color="error" variant="ghost" @click="deletePreset(preset.id)">
               删除
             </UButton>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- 提示信息 -->
-    <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/50">
-      <div class="flex items-start gap-2">
-        <UIcon name="i-heroicons-light-bulb" class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-        <p class="text-xs text-gray-600 dark:text-gray-400">
-          点击预设即可激活。时间信息和工具说明由系统自动注入，你只需编辑角色定义和回答要求。
-        </p>
       </div>
     </div>
   </div>

@@ -243,6 +243,12 @@ export function useAIChat(
         maxMessagesLimit: aiGlobalSettings.value.maxMessagesPerRequest,
       }
 
+      console.log('[AI] 构建 context:', {
+        sessionId,
+        maxMessagesLimit: context.maxMessagesLimit,
+        aiGlobalSettings: aiGlobalSettings.value,
+      })
+
       // 收集历史消息（排除当前用户消息和 AI 占位消息）
       const historyMessages = messages.value
         .slice(0, -2) // 排除刚添加的用户消息和 AI 占位消息
@@ -270,7 +276,10 @@ export function useAIChat(
           return
         }
 
-        console.log('[AI] Agent chunk:', chunk.type, chunk.toolName || chunk.content?.slice(0, 50))
+        // 只在工具调用时记录，减少日志噪音
+        if (chunk.type === 'tool_start' || chunk.type === 'tool_result') {
+          console.log('[AI] Agent chunk:', chunk.type, chunk.toolName)
+        }
 
         switch (chunk.type) {
           case 'content':

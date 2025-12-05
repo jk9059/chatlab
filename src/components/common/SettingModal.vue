@@ -42,9 +42,9 @@ watch(
   () => props.open,
   (newVal) => {
     if (newVal) {
-      activeTab.value = 'ai-config'
-      // 刷新 AI 配置
-      aiConfigRef.value?.refresh()
+      activeTab.value = 'settings' // 默认打开基础设置 Tab
+      // 刷新缓存管理
+      cacheManageRef.value?.refresh()
     }
   }
 )
