@@ -392,6 +392,7 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
 
   // 收集成员和消息
   const memberMap = new Map<string, MemberInfo>()
+  const messageBatch: ParsedMessage[] = []
 
   // 流式解析
   await new Promise<void>((resolve, reject) => {
