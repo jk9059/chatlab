@@ -231,6 +231,11 @@ export const usePromptStore = defineStore(
         if (aiPromptSettings.value.activePresetId === presetId) {
           aiPromptSettings.value.activePresetId = DEFAULT_PRESET_ID
         }
+        // 如果是从远程导入的预设，同时从已导入列表中移除，以便用户可以重新导入
+        const remoteIndex = fetchedRemotePresetIds.value.indexOf(presetId)
+        if (remoteIndex !== -1) {
+          fetchedRemotePresetIds.value.splice(remoteIndex, 1)
+        }
       }
     }
 
@@ -276,7 +281,7 @@ export const usePromptStore = defineStore(
      */
     async function fetchRemotePresets(locale: string): Promise<RemotePresetData[]> {
       const langPath = locale === 'zh-CN' ? 'cn' : 'en'
-      const url = `${REMOTE_PRESET_BASE_URL}/${langPath}/prompt.json`
+      const url = `${REMOTE_PRESET_BASE_URL}/${langPath}/system-prompt.json`
 
       try {
         const result = await window.api.app.fetchRemoteConfig(url)
@@ -290,7 +295,9 @@ export const usePromptStore = defineStore(
         }
 
         // 过滤无效数据
-        return remotePresets.filter((preset) => preset.id && preset.name && preset.roleDefinition && preset.responseRules)
+        return remotePresets.filter(
+          (preset) => preset.id && preset.name && preset.roleDefinition && preset.responseRules
+        )
       } catch {
         return []
       }
