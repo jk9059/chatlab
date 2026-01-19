@@ -1,14 +1,27 @@
 <script setup lang="ts">
 import { FileDropZone } from '@/components/UI'
+import FileListItem from './FileListItem.vue'
 import { storeToRefs } from 'pinia'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useSessionStore, type BatchFileInfo } from '@/stores/session'
+import { useSessionStore, type BatchFileInfo, type MergeFileInfo } from '@/stores/session'
 
 const { t } = useI18n()
 const sessionStore = useSessionStore()
-const { isImporting, importProgress, isBatchImporting, batchFiles, batchImportResult } = storeToRefs(sessionStore)
+const {
+  isImporting,
+  importProgress,
+  isBatchImporting,
+  batchFiles,
+  batchImportResult,
+  // 合并导入
+  isMergeImporting,
+  mergeFiles,
+  mergeStage,
+  mergeError,
+  mergeResult,
+} = storeToRefs(sessionStore)
 
 const importError = ref<string | null>(null)
 const diagnosisSuggestion = ref<string | null>(null)
@@ -16,8 +29,13 @@ const hasImportLog = ref(false)
 
 const router = useRouter()
 
-// 计算是否正在导入（单文件或批量）
-const isAnyImporting = computed(() => isImporting.value || isBatchImporting.value)
+// 更多选项展开状态
+
+// 合并导入开关
+const mergeImportEnabled = ref(false)
+
+// 计算是否正在导入（单文件、批量或合并）
+const isAnyImporting = computed(() => isImporting.value || isBatchImporting.value || isMergeImporting.value)
 
 // 计算批量导入进度
 const batchProgress = computed(() => {
@@ -104,23 +122,43 @@ async function handleFileDrop({ paths }: { files: File[]; paths: string[] }) {
 
 // 统一处理文件路径（单文件或多文件）
 async function processFilePaths(paths: string[]) {
-  if (paths.length === 1) {
-    // 单文件导入 - 使用原有逻辑
-    const result = await sessionStore.importFileFromPath(paths[0])
-    if (!result.success && result.error) {
-      importError.value = translateError(result.error)
-      if (result.diagnosisSuggestion) {
-        diagnosisSuggestion.value = result.diagnosisSuggestion
+  // 单文件 或 未启用合并导入 - 使用原有逻辑
+  if (paths.length === 1 || !mergeImportEnabled.value) {
+    if (paths.length === 1) {
+      // 单文件导入
+      const result = await sessionStore.importFileFromPath(paths[0])
+      if (!result.success && result.error) {
+        importError.value = translateError(result.error)
+        if (result.diagnosisSuggestion) {
+          diagnosisSuggestion.value = result.diagnosisSuggestion
+        }
+        await checkImportLog()
+      } else if (result.success && sessionStore.currentSessionId) {
+        await navigateToSession(sessionStore.currentSessionId)
       }
-      await checkImportLog()
-    } else if (result.success && sessionStore.currentSessionId) {
-      await navigateToSession(sessionStore.currentSessionId)
+    } else {
+      // 多文件批量导入（未启用合并）
+      await sessionStore.importFilesFromPaths(paths)
     }
-  } else {
-    // 多文件批量导入
-    await sessionStore.importFilesFromPaths(paths)
-    // 批量导入完成后不自动跳转，显示结果摘要
+    return
   }
+
+  // 多文件 + 合并导入（调用 store 方法）
+  await sessionStore.mergeImportFiles(paths)
+}
+
+// 关闭合并结果并跳转
+async function handleMergeGoToSession() {
+  if (mergeResult.value?.sessionId) {
+    const sessionId = mergeResult.value.sessionId
+    sessionStore.clearMergeImportResult()
+    await navigateToSession(sessionId)
+  }
+}
+
+// 关闭合并结果
+function closeMergeResult() {
+  sessionStore.clearMergeImportResult()
 }
 
 // 取消批量导入
@@ -195,69 +233,40 @@ function getProgressDetail(): string {
   return importProgress.value.message || ''
 }
 
-// 获取文件状态图标
-function getFileStatusIcon(file: BatchFileInfo): string {
-  switch (file.status) {
-    case 'pending':
-      return 'i-heroicons-clock'
-    case 'importing':
-      return 'i-heroicons-arrow-path'
-    case 'success':
-      return 'i-heroicons-check-circle'
-    case 'failed':
-      return 'i-heroicons-x-circle'
-    case 'cancelled':
-      return 'i-heroicons-minus-circle'
-    default:
-      return 'i-heroicons-question-mark-circle'
-  }
+// 文件状态配置
+const STATUS_CONFIG: Record<string, { icon: string; class: string }> = {
+  pending: { icon: 'i-heroicons-clock', class: 'text-gray-400' },
+  importing: { icon: 'i-heroicons-arrow-path', class: 'text-pink-500 animate-spin' },
+  parsing: { icon: 'i-heroicons-arrow-path', class: 'text-pink-500 animate-spin' },
+  success: { icon: 'i-heroicons-check-circle', class: 'text-green-500' },
+  done: { icon: 'i-heroicons-check-circle', class: 'text-green-500' },
+  failed: { icon: 'i-heroicons-x-circle', class: 'text-red-500' },
+  cancelled: { icon: 'i-heroicons-minus-circle', class: 'text-gray-400' },
 }
 
-// 获取文件状态颜色类名
-function getFileStatusClass(file: BatchFileInfo): string {
-  switch (file.status) {
-    case 'pending':
-      return 'text-gray-400'
-    case 'importing':
-      return 'text-pink-500 animate-spin'
-    case 'success':
-      return 'text-green-500'
-    case 'failed':
-      return 'text-red-500'
-    case 'cancelled':
-      return 'text-gray-400'
-    default:
-      return 'text-gray-400'
-  }
-}
+const getStatusIcon = (status: string) => STATUS_CONFIG[status]?.icon ?? 'i-heroicons-question-mark-circle'
+const getStatusClass = (status: string) => STATUS_CONFIG[status]?.class ?? 'text-gray-400'
 
-// 获取文件进度描述
-function getFileProgressText(file: BatchFileInfo): string {
+// 获取批量导入文件进度描述
+function getBatchFileProgressText(file: BatchFileInfo): string {
   if (file.status === 'pending') return t('home.import.batch.waiting')
   if (file.status === 'cancelled') return t('home.import.batch.skipped')
   if (file.status === 'success') return t('home.import.batch.success')
   if (file.status === 'failed') return translateError(file.error || 'error.import_failed')
-
   // importing 状态
   if (file.progress) {
-    switch (file.progress.stage) {
-      case 'detecting':
-        return t('home.import.progress.detecting')
-      case 'reading':
-        return t('home.import.progress.reading')
-      case 'parsing':
-        if (file.progress.messagesProcessed) {
-          return t('home.import.processed', { count: file.progress.messagesProcessed.toLocaleString() })
-        }
-        return t('home.import.progress.parsing')
-      case 'saving':
-        return t('home.import.progress.saving')
-      default:
-        return ''
+    const { stage, messagesProcessed } = file.progress
+    if (stage === 'parsing' && messagesProcessed) {
+      return t('home.import.processed', { count: messagesProcessed.toLocaleString() })
     }
+    return t(`home.import.progress.${stage}`)
   }
   return ''
 }
+
+// 获取合并文件进度描述
+const getMergeFileProgressText = (file: MergeFileInfo) =>
+  file.info ? t('home.import.merge.messageCount', { count: file.info.messageCount.toLocaleString() }) : ''
 </script>
 
 <template>
@@ -294,24 +303,97 @@ function getFileProgressText(file: BatchFileInfo): string {
 
       <!-- 文件列表 -->
       <div class="max-h-80 space-y-2 overflow-y-auto">
-        <div
+        <FileListItem
           v-for="(file, index) in batchFiles"
           :key="file.path"
-          class="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-          :class="{
-            'bg-pink-50/50 dark:bg-pink-500/5': file.status === 'importing',
-          }"
-        >
-          <UIcon :name="getFileStatusIcon(file)" class="h-5 w-5 shrink-0" :class="getFileStatusClass(file)" />
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-              {{ file.name }}
+          :name="file.name"
+          :status-icon="getStatusIcon(file.status)"
+          :status-class="getStatusClass(file.status)"
+          :progress-text="getBatchFileProgressText(file)"
+          :index="index"
+          :total="batchFiles.length"
+          :highlight="file.status === 'importing'"
+        />
+      </div>
+    </div>
+
+    <!-- 合并导入进度 -->
+    <div
+      v-else-if="isMergeImporting && mergeStage !== 'done'"
+      class="w-full max-w-4xl rounded-3xl border border-gray-200/50 bg-gray-100/50 px-8 py-8 backdrop-blur-md dark:border-white/10 dark:bg-gray-800/40"
+    >
+      <!-- 标题 -->
+      <div class="mb-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-50 dark:bg-pink-500/10">
+            <UIcon
+              v-if="mergeStage !== 'error'"
+              name="i-heroicons-arrow-path"
+              class="h-5 w-5 animate-spin text-pink-600 dark:text-pink-400"
+            />
+            <UIcon v-else name="i-heroicons-x-circle" class="h-5 w-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ mergeStage === 'error' ? t('home.import.merge.failed') : t('home.import.merge.importing') }}
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              {{ getFileProgressText(file) }}
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ mergeStage === 'parsing' ? t('home.import.merge.parsing') : '' }}
+              {{ mergeStage === 'merging' ? t('home.import.merge.merging') : '' }}
+              {{ mergeStage === 'error' ? mergeError : '' }}
             </p>
           </div>
-          <span class="text-xs text-gray-400">{{ index + 1 }}/{{ batchFiles.length }}</span>
+        </div>
+        <UButton
+          v-if="mergeStage === 'error'"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          icon="i-heroicons-x-mark"
+          @click="closeMergeResult"
+        />
+      </div>
+
+      <!-- 文件列表 -->
+      <div class="max-h-80 space-y-2 overflow-y-auto">
+        <FileListItem
+          v-for="(file, index) in mergeFiles"
+          :key="file.path"
+          :name="file.name"
+          :status-icon="getStatusIcon(file.status)"
+          :status-class="getStatusClass(file.status)"
+          :progress-text="getMergeFileProgressText(file)"
+          :index="index"
+          :total="mergeFiles.length"
+          :highlight="file.status === 'parsing'"
+        />
+      </div>
+    </div>
+
+    <!-- 合并导入完成 -->
+    <div
+      v-else-if="isMergeImporting && mergeStage === 'done' && mergeResult"
+      class="w-full max-w-4xl rounded-3xl border border-gray-200/50 bg-gray-100/50 px-8 py-8 backdrop-blur-md dark:border-white/10 dark:bg-gray-800/40"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 dark:bg-green-500/10">
+            <UIcon name="i-heroicons-check-circle" class="h-5 w-5 text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('home.import.merge.completed') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('home.import.merge.completedHint', { count: mergeFiles.length }) }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <UButton color="neutral" variant="ghost" size="sm" icon="i-heroicons-x-mark" @click="closeMergeResult" />
+          <UButton size="sm" @click="handleMergeGoToSession">
+            {{ t('home.import.batch.view') }}
+          </UButton>
         </div>
       </div>
     </div>
@@ -360,32 +442,29 @@ function getFileProgressText(file: BatchFileInfo): string {
 
       <!-- 文件列表 -->
       <div class="max-h-80 space-y-2 overflow-y-auto">
-        <div
-          v-for="file in batchImportResult.files"
+        <FileListItem
+          v-for="(file, index) in batchImportResult.files"
           :key="file.path"
-          class="flex items-center gap-3 rounded-lg px-3 py-2"
+          :name="file.name"
+          :status-icon="getStatusIcon(file.status)"
+          :status-class="getStatusClass(file.status)"
+          :index="index"
+          :total="batchImportResult.files.length"
         >
-          <UIcon :name="getFileStatusIcon(file)" class="h-5 w-5 shrink-0" :class="getFileStatusClass(file)" />
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">
-              {{ file.name }}
-            </p>
+          <template #extra>
             <p v-if="file.status === 'failed'" class="text-xs text-red-500">
               {{ translateError(file.error || 'error.import_failed') }}
             </p>
             <p v-else-if="file.status === 'cancelled'" class="text-xs text-gray-500">
               {{ t('home.import.batch.skipped') }}
             </p>
-          </div>
-          <UButton
-            v-if="file.status === 'success' && file.sessionId"
-            size="xs"
-            variant="soft"
-            @click="handleGoToSession(file.sessionId)"
-          >
-            {{ t('home.import.batch.view') }}
-          </UButton>
-        </div>
+          </template>
+          <template v-if="file.status === 'success' && file.sessionId" #action>
+            <UButton size="xs" variant="soft" @click="handleGoToSession(file.sessionId!)">
+              {{ t('home.import.batch.view') }}
+            </UButton>
+          </template>
+        </FileListItem>
       </div>
     </div>
 
@@ -400,7 +479,7 @@ function getFileProgressText(file: BatchFileInfo): string {
     >
       <template #default="{ isDragOver }">
         <div
-          class="group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-3xl border border-gray-200/50 bg-gray-100/50 px-8 py-10 backdrop-blur-md transition-all duration-300 hover:border-pink-500/30 hover:bg-gray-100/80 hover:shadow-2xl hover:shadow-pink-500/10 focus:outline-none focus:ring-4 focus:ring-pink-500/20 sm:px-12 sm:py-14 dark:border-white/10 dark:bg-gray-800/40 dark:hover:border-pink-500/30 dark:hover:bg-gray-800/60"
+          class="group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-3xl border border-gray-200/50 bg-gray-100/50 px-8 py-4 backdrop-blur-md transition-all duration-300 hover:border-pink-500/30 hover:bg-gray-100/80 hover:shadow-2xl hover:shadow-pink-500/10 focus:outline-none focus:ring-4 focus:ring-pink-500/20 sm:px-12 sm:py-6 dark:border-white/10 dark:bg-gray-800/40 dark:hover:border-pink-500/30 dark:hover:bg-gray-800/60"
           :class="{
             'border-pink-500/50 bg-pink-50/50 dark:border-pink-400/50 dark:bg-pink-500/10':
               isDragOver && !isAnyImporting,
@@ -408,9 +487,9 @@ function getFileProgressText(file: BatchFileInfo): string {
           }"
           @click="!isAnyImporting && handleClickImport()"
         >
-          <!-- Icon -->
+          <!-- 上传图标容器 -->
           <div
-            class="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-pink-50 transition-transform duration-300 group-hover:scale-105 dark:bg-pink-500/10"
+            class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105"
             :class="{ 'scale-105': isDragOver && !isAnyImporting, 'animate-pulse': isImporting }"
           >
             <UIcon
@@ -446,6 +525,30 @@ function getFileProgressText(file: BatchFileInfo): string {
         </div>
       </template>
     </FileDropZone>
+
+    <!-- 合并导入选项 -->
+    <div v-if="!isAnyImporting && !batchImportResult" class="flex items-center justify-center">
+      <div class="flex items-center gap-2">
+        <UCheckbox
+          v-model="mergeImportEnabled"
+          :label="t('home.import.options.mergeImport')"
+          input-class="h-4 w-4"
+          size="sm"
+          label-class="text-sm font-medium text-gray-600 dark:text-gray-300"
+        />
+        <UPopover mode="hover">
+          <UIcon
+            name="i-heroicons-question-mark-circle"
+            class="h-4 w-4 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+          />
+          <template #content>
+            <div class="max-w-xs px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+              {{ t('home.import.options.mergeImportHint') }}
+            </div>
+          </template>
+        </UPopover>
+      </div>
+    </div>
 
     <!-- Error Message -->
     <div

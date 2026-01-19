@@ -42,6 +42,34 @@ export interface BatchImportResult {
   files: BatchFileInfo[]
 }
 
+/** 合并导入文件状态 */
+export type MergeFileStatus = 'pending' | 'parsing' | 'done'
+
+/** 合并导入单个文件信息 */
+export interface MergeFileInfo {
+  path: string
+  name: string
+  status: MergeFileStatus
+  info?: {
+    name: string
+    format: string
+    platform: string
+    messageCount: number
+    memberCount: number
+    fileSize?: number
+  }
+}
+
+/** 合并导入阶段 */
+export type MergeImportStage = 'parsing' | 'merging' | 'done' | 'error'
+
+/** 合并导入结果 */
+export interface MergeImportResult {
+  success: boolean
+  sessionId?: string
+  error?: string
+}
+
 /**
  * 会话与导入相关的全局状态
  */
@@ -63,6 +91,13 @@ export const useSessionStore = defineStore(
     const batchFiles = ref<BatchFileInfo[]>([])
     const batchImportCancelled = ref(false)
     const batchImportResult = ref<BatchImportResult | null>(null)
+
+    // 合并导入状态
+    const isMergeImporting = ref(false)
+    const mergeFiles = ref<MergeFileInfo[]>([])
+    const mergeStage = ref<MergeImportStage>('parsing')
+    const mergeError = ref<string | null>(null)
+    const mergeResult = ref<MergeImportResult | null>(null)
 
     // 当前选中的会话
     const currentSession = computed(() => {
@@ -452,6 +487,129 @@ export const useSessionStore = defineStore(
     }
 
     /**
+     * 合并导入多个文件为一个会话
+     */
+    async function mergeImportFiles(filePaths: string[]): Promise<MergeImportResult> {
+      if (filePaths.length < 2) {
+        return { success: false, error: '合并导入至少需要2个文件' }
+      }
+
+      // 阶段最小显示时间（和单文件导入保持一致）
+      const MIN_STAGE_TIME = 800
+
+      isMergeImporting.value = true
+      mergeError.value = null
+      mergeResult.value = null
+      mergeStage.value = 'parsing'
+
+      // 初始化文件列表
+      mergeFiles.value = filePaths.map((path) => ({
+        path,
+        name: path.split('/').pop() || path.split('\\').pop() || path,
+        status: 'pending' as MergeFileStatus,
+      }))
+
+      let stageStartTime = Date.now()
+
+      try {
+        // 阶段1：串行解析所有文件
+        for (let i = 0; i < mergeFiles.value.length; i++) {
+          const file = mergeFiles.value[i]
+          const fileStartTime = Date.now()
+          file.status = 'parsing'
+
+          try {
+            const info = await window.mergeApi.parseFileInfo(file.path)
+            file.info = info
+
+            // 确保每个文件的解析状态至少显示一定时间
+            const elapsed = Date.now() - fileStartTime
+            const minFileTime = Math.max(300, MIN_STAGE_TIME / filePaths.length)
+            if (elapsed < minFileTime) {
+              await new Promise((resolve) => setTimeout(resolve, minFileTime - elapsed))
+            }
+
+            file.status = 'done'
+          } catch (err) {
+            throw new Error(`解析文件失败: ${file.name} - ${err instanceof Error ? err.message : String(err)}`)
+          }
+        }
+
+        // 确保解析阶段至少显示 MIN_STAGE_TIME
+        const parsingElapsed = Date.now() - stageStartTime
+        if (parsingElapsed < MIN_STAGE_TIME) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_STAGE_TIME - parsingElapsed))
+        }
+
+        // 阶段2：执行合并
+        stageStartTime = Date.now()
+        mergeStage.value = 'merging'
+
+        // 智能命名：如果所有文件群名相同则用该名，否则用第一个文件的群名
+        const names = mergeFiles.value.map((f) => f.info?.name).filter(Boolean)
+        const uniqueNames = [...new Set(names)]
+        const outputName = uniqueNames.length === 1 ? uniqueNames[0]! : (names[0] || '合并记录')
+
+        const result = await window.mergeApi.mergeFiles({
+          filePaths,
+          outputName,
+          conflictResolutions: [], // 默认 keepBoth（保留所有消息）
+          andAnalyze: true, // 合并后创建会话
+        })
+
+        if (!result.success) {
+          throw new Error(result.error || '合并失败')
+        }
+
+        // 清理缓存
+        await window.mergeApi.clearCache()
+
+        // 确保合并阶段至少显示 MIN_STAGE_TIME
+        const mergingElapsed = Date.now() - stageStartTime
+        if (mergingElapsed < MIN_STAGE_TIME) {
+          await new Promise((resolve) => setTimeout(resolve, MIN_STAGE_TIME - mergingElapsed))
+        }
+
+        mergeStage.value = 'done'
+        mergeResult.value = { success: true, sessionId: result.sessionId }
+
+        // 刷新会话列表
+        await loadSessions()
+
+        // 自动生成会话索引
+        if (result.sessionId) {
+          try {
+            const savedThreshold = localStorage.getItem('sessionGapThreshold')
+            const gapThreshold = savedThreshold ? parseInt(savedThreshold, 10) : 1800
+            await window.sessionApi.generate(result.sessionId, gapThreshold)
+          } catch (error) {
+            console.error('自动生成会话索引失败:', error)
+          }
+        }
+
+        return { success: true, sessionId: result.sessionId }
+      } catch (err) {
+        mergeStage.value = 'error'
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        mergeError.value = errorMessage
+        mergeResult.value = { success: false, error: errorMessage }
+        // 清理缓存
+        await window.mergeApi.clearCache()
+        return { success: false, error: errorMessage }
+      }
+    }
+
+    /**
+     * 清除合并导入结果
+     */
+    function clearMergeImportResult() {
+      isMergeImporting.value = false
+      mergeFiles.value = []
+      mergeResult.value = null
+      mergeError.value = null
+    }
+
+    /**
      * 选择指定会话
      */
     function selectSession(id: string) {
@@ -607,6 +765,14 @@ export const useSessionStore = defineStore(
       importFilesFromPaths,
       cancelBatchImport,
       clearBatchImportResult,
+      // 合并导入
+      isMergeImporting,
+      mergeFiles,
+      mergeStage,
+      mergeError,
+      mergeResult,
+      mergeImportFiles,
+      clearMergeImportResult,
     }
   },
   {

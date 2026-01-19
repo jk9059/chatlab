@@ -51,6 +51,22 @@
       "completed": "Batch import completed",
       "summary": "{success} succeeded, {failed} failed, {cancelled} skipped",
       "view": "View"
+    },
+    "options": {
+      "title": "More Options",
+      "mergeImport": "Merge Import",
+      "mergeImportHint": "Multiple files will be merged into one chat record"
+    },
+    "merge": {
+      "importing": "Merging",
+      "parsing": "Parsing files...",
+      "parsingFile": "Parsing: {name}",
+      "merging": "Merging messages...",
+      "completed": "Merge completed",
+      "completedHint": "{count} files merged",
+      "messageCount": "{count} messages",
+      "failed": "Merge failed",
+      "cancel": "Cancel merge"
     }
   },
   "migration": {

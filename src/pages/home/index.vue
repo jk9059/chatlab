@@ -31,10 +31,7 @@ const features = computed(() => [
         <!-- Hero Section -->
         <div class="relative xl:mb-6 mb-4 w-full text-center">
           <!-- 标题上方可拖拽区域，向上扩展覆盖空隙 -->
-          <div
-            class="absolute -top-32 left-0 right-0 h-32"
-            style="-webkit-app-region: drag"
-          />
+          <div class="absolute -top-32 left-0 right-0 h-32" style="-webkit-app-region: drag" />
           <!-- Title -->
           <h1 class="mb-4 select-none text-5xl sm:text-5xl lg:text-6xl font-black tracking-tight text-pink-500">
             {{ t('home.title') }}
@@ -42,7 +39,6 @@ const features = computed(() => [
           <!-- Description -->
           <div class="relative select-none inline-block mb-8">
             <p class="text-lg sm:text-5xl text-gray-700 dark:text-gray-400 font-medium">{{ t('home.subtitle') }}</p>
-            <UIcon name="i-heroicons-sparkles" class="absolute -right-6 -top-3 h-5 w-5 animate-bounce text-pink-400" />
           </div>
         </div>
 

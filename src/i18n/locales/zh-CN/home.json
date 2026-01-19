@@ -51,6 +51,22 @@
       "completed": "批量导入完成",
       "summary": "成功 {success} 个，失败 {failed} 个，跳过 {cancelled} 个",
       "view": "查看"
+    },
+    "options": {
+      "title": "更多选项",
+      "mergeImport": "合并导入",
+      "mergeImportHint": "勾选后，多个文件将合并为一个聊天记录"
+    },
+    "merge": {
+      "importing": "正在合并",
+      "parsing": "正在解析文件...",
+      "parsingFile": "正在解析: {name}",
+      "merging": "正在合并消息...",
+      "completed": "合并完成",
+      "completedHint": "{count} 个文件已合并",
+      "messageCount": "{count} 条消息",
+      "failed": "合并失败",
+      "cancel": "取消合并"
     }
   },
   "migration": {
